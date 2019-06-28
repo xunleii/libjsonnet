@@ -1,0 +1,160 @@
+{
+  local _ = self,
+
+  //
+  // ------ Arrays tools
+  //
+  // -- Arrays :: State tools (immutable)
+  // allTypeOf returns true when all item match with the given type checker
+  local _allTypeOf = function(arr, isTypeOf, len=std.length(arr))
+    std.length([x for x in arr if isTypeOf(x)]) == len,
+  allTypeOf(arr, isTypeOf)::
+    assert std.isArray(arr) : 'utils.allTypeOf first parameter should be an array, got ' + std.type(arr);
+    assert std.isFunction(isTypeOf) : 'utils.allTypeOf second parameter should be a function, got ' + std.type(isTypeOf);
+    _allTypeOf(arr, isTypeOf),
+
+  // isEmpty returns true is the given array/object is empty, else false
+  local _isEmpty = function(x) std.length(if std.isObject(x) then std.objectFields(x) else x) == 0,
+  isEmpty(x)::
+    assert std.isObject(x) || std.isArray(x) : 'utils.isEmpty first parameter should be an array or an object, got ' + std.type(x);
+    _isEmpty(x),
+
+  // contains returns true when the given value is found, else false
+  local _contains = function(arr, v) std.length(std.find(v, arr)) > 0,
+  contains(arr, v)::
+    assert std.isArray(arr) : 'utils.contains first parameter should be an array, got ' + std.type(arr);
+    _contains(arr, v),
+
+  // -- Arrays :: Extraction tools (immutable)
+  // findFirst returns first index element which match with the given value
+  local _findFirst = function(arr, value) _findFirstWith(arr, function(x) x == value),
+  findFirst(arr, value)::
+    assert std.isArray(arr) : 'utils.findFirst first parameter should be an array, got ' + std.type(arr);
+    _findFirst(arr, value),
+
+  // findFirstWith returns first index element which match with the given predicate (returns -1 if nothing found)
+  local _findFirstWith = function(arr, predicate, i=0, len=std.length(arr))
+    if i == len then -1
+    else if predicate(arr[i]) then i
+    else _findFirstWith(arr, predicate, i + 1, len) tailstrict,
+  findFirstWith(arr, predicate)::
+    assert std.isArray(arr) : 'utils.findFirstWith first parameter should be an array, got ' + std.type(arr);
+    assert std.isFunction(predicate) : 'utils.findFirstWith second parameter should be a function, got ' + std.type(predicate);
+    _findFirstWith(arr, predicate),
+
+  // findLast returns last index element which match with the given value
+  local _findLast = function(arr, value) _findLastWith(arr, function(x) x == value),
+  findLast(arr, value)::
+    assert std.isArray(arr) : 'utils.findWith first parameter should be an array, got ' + std.type(arr);
+    _findLast(arr, value),
+
+  // findLastWith returns last index element which match with the given predicate (returns -1 if nothing found)
+  local _findLastWith = function(arr, predicate, i=std.length(arr) - 1)
+    if i == -1 || predicate(arr[i]) then i
+    else _findLastWith(arr, predicate, i - 1) tailstrict,
+  findLastWith(arr, predicate)::
+    assert std.isArray(arr) : 'utils.findLastWith first parameter should be an array, got ' + std.type(arr);
+    assert std.isFunction(predicate) : 'utils.findLastWith second parameter should be a function, got ' + std.type(predicate);
+    _findLastWith(arr, predicate),
+
+
+  // findWith returns all element index which match with the given predicate
+  local _findWith = function(arr, predicate)
+    [i for i in std.filter(function(i) predicate(arr[i]), std.range(0, std.length(arr) - 1))],
+  findWith(arr, predicate)::
+    assert std.isArray(arr) : 'utils.findWith first parameter should be an array, got ' + std.type(arr);
+    assert std.isFunction(predicate) : 'utils.findWith second parameter should be a function, got ' + std.type(predicate);
+    _findWith(arr, predicate),
+
+  // head returns the x first elements in the given array (default: the first element only)
+  local _head = function(arr, n=1)
+    [arr[i] for i in std.range(0, n - 1)],
+  head(arr, n=1)::
+    assert std.isArray(arr) : 'utils.head first parameter should be an array, got ' + std.type(arr);
+    assert std.isNumber(n) : 'utils.head second parameter should be a number, got ' + std.type(n);
+    assert n >= 0 && n <= std.length(arr) : 'utils.head second parameter is out of range (%d not in [0, %d])' % [n, std.length(arr)];
+    _head(arr, n),
+
+  // tail returns the x last elements in the given array (default: all except the first one)
+  local _tail = function(arr, n=std.length(arr) - 1)
+    [arr[i] for i in std.range(std.length(arr) - n, std.length(arr) - 1)],
+  tail(arr, n=std.length(arr) - 1)::
+    assert std.isArray(arr) : 'utils.tail first parameter should be an array, got ' + std.type(arr);
+    assert std.isNumber(n) : 'utils.tail second parameter should be a number, got ' + std.type(n);
+    assert n >= 0 && n <= std.length(arr) : 'utils.tail second parameter is out of range (%d not in [0, %d])' % [n, std.length(arr)];
+    _tail(arr, n),
+
+  // -- Arrays :: Edition tools
+  // reverse reverses all item position in an array
+  local _reverse = function(arr, len=std.length(arr))
+    [arr[len - i] for i in std.range(1, std.length(arr))],
+  reverse(arr)::
+    assert std.isArray(arr) : 'utils.reverse first parameter should be an array, got ' + std.type(arr);
+    _reverse(arr),
+
+  // uniq removes duplicates using predicate (internal usage only)
+  local _uniq = function(arr, predicate)
+    [arr[i] for i in std.range(0, std.length(arr) - 1) if predicate(arr, i)],
+
+  // uniqr removes duplicates, traversing the array from left to right
+  // WARN: heavy function, do not use on big array
+  local _uniql_predicate = function(arr, i, find=std.find(arr[i], arr)) !_isEmpty(find) && find[0] == i,
+  local _uniql = function(arr) _uniq(arr, _uniql_predicate),
+  uniql(arr)::
+    assert std.isArray(arr) : 'utils.uniql first parameter should be an array, got ' + std.type(arr);
+    _uniql(arr),
+
+  // uniqr removes duplicates, traversing the array from right to left
+  // WARN: heavy function, do not use on big array
+  local _uniqr_predicate = function(arr, i, find=std.find(arr[i], arr)) !_isEmpty(find) && find[std.length(find) - 1] == i,
+  local _uniqr = function(arr) _uniq(arr, _uniqr_predicate),
+  uniqr(arr)::
+    assert std.isArray(arr) : 'utils.uniqr first parameter should be an array, got ' + std.type(arr);
+    _uniqr(arr),
+
+  // -- Arrays :: Custom patching tools
+  // patchArray remove all value, using value starting by '~' as key
+  local _hasRemovePrefix = function(str) std.isString(str) && str[0] == '~',
+  local _patchArray = function(arr, tags=[std.substr(x, 1, std.length(x)) for x in arr if _hasRemovePrefix(x)])
+    [x for x in arr if !_hasRemovePrefix(x) && !_contains(tags, x)],
+  patchArray(arr)::
+    assert std.isArray(arr) : 'utils.patchArray first parameter should be an array, got ' + std.type(arr);
+    _patchArray(arr),
+
+  // -- Arrays :: Convertion tools
+  // toObject converts an array to object
+  toObject(arr)::
+    assert std.isArray(arr) : 'utils.toObject first parameter should be an array, got ' + std.type(arr);
+    std.foldl(function(lhs, rhs) lhs + rhs, std.mapWithIndex(function(i, val) { [('%06d' % [i])]: val }, arr), {}),
+
+  //
+  // ------ Objects tools
+  //
+  // -- Objects :: State tools (immutable)
+  // objectHas returns true if the object contains the field or the nested field
+  local _objectHas = function(obj, fields)
+    if std.isString(fields) then std.objectHas(obj, fields)
+    else _nestedObjectHas(obj, fields),
+  local _nestedObjectHas = function(obj, fields)
+    if std.objectHas(obj, fields[0]) then
+      if std.length(fields) == 1 then true
+      else if std.isObject(obj[fields[0]]) then _nestedObjectHas(obj[fields[0]], _tail(fields)) tailstrict
+      else false
+    else false,
+  objectHas(obj, fields)::
+    assert std.isObject(obj) : 'utils.objectHas first parameter should be an object, got ' + std.type(obj);
+    assert (std.isArray(fields) && _allTypeOf(fields, std.isString)) || std.isString(fields) : 'utils.objectHas second parameter should be a string or a non empty string array, got ' + std.type(fields);
+    _objectHas(obj, fields),
+
+  // -- Objects :: Edition tools
+  // deepMerge merge two object recursively, merging also array.
+  local _deepMerge = function(a, b, uniqFnc=_uniql)
+    if std.type(a) != std.type(b) then b
+    else if std.isArray(a) then uniqFnc(a + b)
+    else if std.isObject(a) then a + b + { [k]: _deepMerge(a[k], b[k], uniqFnc) tailstrict for k in std.setInter(std.objectFields(a), std.objectFields(b)) }
+    else b,
+  deepMerge(a, b, uniqFnc=_uniql)::
+    assert std.type(a) == std.type(b) : 'utils.deepMerge merge only same types of values (%s != %s)' % [std.type(a), std.type(b)];
+    assert std.isFunction(uniqFnc) : 'utils.deepMerge second parameter should be a function, got ' + std.type(uniqFnc);
+    _deepMerge(a, b, uniqFnc) tailstrict,
+}
