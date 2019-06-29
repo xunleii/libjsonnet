@@ -1,0 +1,98 @@
+{
+  pow2:: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432, 67108864, 134217728, 268435456, 536870912, 1073741824, 2147483648, 4294967296],
+  mask:: [0, 2147483648, 3221225472, 3758096384, 4026531840, 4160749568, 4227858432, 4261412864, 4278190080, 4286578688, 4290772992, 4292870144, 4293918720, 4294443008, 4294705152, 4294836224, 4294901760, 4294934528, 4294950912, 4294959104, 4294963200, 4294965248, 4294966272, 4294966784, 4294967040, 4294967168, 4294967232, 4294967264, 4294967280, 4294967288, 4294967292, 4294967294, 4294967295],
+  wildcard:: [4294967295, 2147483647, 1073741823, 536870911, 268435455, 134217727, 67108863, 33554431, 16777215, 8388607, 4194303, 2097151, 1048575, 524287, 262143, 131071, 65535, 32767, 16383, 8191, 4095, 2047, 1023, 511, 255, 127, 63, 31, 15, 7, 3, 1, 0],
+  ip_mask:: [4278190080, 16711680, 65280, 255],
+
+  ipv4:: {
+    addr:: {
+      parse(addr, mask=-1)::
+        assert std.isString(addr) || std.isNumber(addr) : 'ipv4.addr.parse first parameter must be a number or a string';
+        if std.isNumber(addr)
+        then
+          local str_addr = ('' + ((addr & $.ip_mask[0]) / $.pow2[24]) +
+                            '.' + ((addr & $.ip_mask[1]) / $.pow2[16]) +
+                            '.' + ((addr & $.ip_mask[2]) / $.pow2[8]) +
+                            '.' + (addr & $.ip_mask[3]));
+
+          assert addr >= 0 && addr < $.pow2[32] : 'ipv4.addr.parse first parameter must be a valid IPv4 address';
+          assert mask >= 0 && mask <= 32 : 'ipv4.addr.parse second parameter must be a valid IPv4 mask';
+
+          {
+            short:: str_addr,
+            full:: self.short + '/' + self.mask,
+            bytes:: addr,
+            mask:: mask,
+          }
+        else
+          local saddr = std.split(addr, '/');
+          local sbytes = std.split(saddr[0], '.');
+          local bytes = [std.parseInt(sbytes[0]), std.parseInt(sbytes[1]), std.parseInt(sbytes[2]), std.parseInt(sbytes[3])];
+          local netmask = (if std.length(saddr) == 1 then mask else std.parseInt(saddr[1]));
+
+          assert std.length(saddr) < 3 : 'ipv4.addr.parse first parameter must be a valid IPv4 address';
+          assert std.length(sbytes) == 4 : 'ipv4.addr.parse first parameter must be a valid IPv4 address';
+          assert bytes[0] >= 0 && bytes[0] <= 255 : 'ipv4.addr.parse first parameter must be a valid IPv4 address (invalid first byte)';
+          assert bytes[1] >= 0 && bytes[1] <= 255 : 'ipv4.addr.parse first parameter must be a valid IPv4 address (invalid second byte)';
+          assert bytes[2] >= 0 && bytes[2] <= 255 : 'ipv4.addr.parse first parameter must be a valid IPv4 address (invalid third byte)';
+          assert bytes[3] >= 0 && bytes[3] <= 255 : 'ipv4.addr.parse first parameter must be a valid IPv4 address (invalid fourth byte)';
+          assert netmask >= 0 && netmask <= 32 : (if std.length(saddr) == 1 then 'ipv4.addr.parse first parameter must be a valid IPv4 address (invalid mask)'
+                                                  else 'ipv4.addr.parse second parameter must be a valid IPv4 mask');
+
+          {
+            short:: saddr[0],
+            full:: self.short + '/' + self.mask,
+            bytes:: bytes[0] * $.pow2[24] + bytes[1] * $.pow2[16] + bytes[2] * $.pow2[8] + bytes[3],
+            mask:: netmask,
+          },
+    },
+
+    subnet(addr, mask=-1, ignore_validation=false)::
+      assert std.isNumber(addr) || std.isString(addr) || std.isObject(addr) : 'ipv4.subnet first parameter must be a number or a string';
+      local numericAddress = function(addr, mask)
+        assert std.isNumber(addr) && std.isNumber(mask) : 'ipv4.subnet first parameter must be a valid IPv4 address';
+        assert addr >= 0 && addr <= $.pow2[32] && mask >= 0 && mask <= 32 : 'ipv4.subnet first parameter must be a valid IPv4 address';
+        { bytes:: addr, mask:: mask };
+      local objectAddress = function(obj_addr)
+        assert (std.objectHasAll(obj_addr, 'short') &&
+                std.objectHasAll(obj_addr, 'full') &&
+                std.objectHasAll(obj_addr, 'bytes') &&
+                std.objectHasAll(obj_addr, 'mask')) : 'ipv4.subnet first parameter is invalid';
+        assert obj_addr.bytes >= 0 && obj_addr.bytes <= $.pow2[32] && obj_addr.mask >= 0 && obj_addr.mask <= 32 : 'ipv4.subnet first parameter must be a valid IPv4 address';
+        obj_addr;
+      local stringAddress = function(str_addr, mask)
+        $.ipv4.addr.parse(str_addr, mask);
+
+      {
+        _addr:: (if ignore_validation then addr
+                 else if std.isNumber(addr) then numericAddress(addr, mask)
+                 else if std.isString(addr) then stringAddress(addr, mask)
+                 else objectAddress(addr))
+                + { net:: self.bytes & $.mask[self.mask] },
+
+        prev(index=1):: self.next(-index),
+        next(index=1)::
+          local bytes = self._addr.net + $.pow2[32 - self._addr.mask] * index;
+          local mask = self._addr.mask;
+          $.ipv4.subnet({ bytes:: bytes, mask:: mask }, null, true),
+
+        address: $.ipv4.addr.parse(self._addr.net, self._addr.mask).short,
+        broadcast: (if self._addr.mask > 30 then null
+                    else if self._addr.mask == 0 then '255.255.255.255'
+                    else $.ipv4.addr.parse(self.next()._addr.net - 1, self._addr.mask).short),
+        mask: self._addr.mask,
+        netmask: $.ipv4.addr.parse($.mask[self._addr.mask], self._addr.mask).short,
+        wildcard: $.ipv4.addr.parse($.wildcard[self._addr.mask], self._addr.mask).short,
+
+        hostMin: (if self._addr.mask > 30 then self.address
+                  else $.ipv4.addr.parse(self._addr.net + 1, self._addr.mask).short),
+        hostMax: (if self._addr.mask == 32 then self.address
+                  else if self._addr.mask == 31 then $.ipv4.addr.parse(self._addr.net + 1, self._addr.mask).short
+                  else if self._addr.mask == 0 then '255.255.255.254'
+                  else $.ipv4.addr.parse(self.next()._addr.net - 2, self._addr.mask).short),
+        numHost: (if self._addr.mask == 32 then 1
+                  else if self._addr.mask == 31 then 2
+                  else $.pow2[32 - self._addr.mask] - 2),
+      },
+  },
+}
