@@ -146,6 +146,23 @@
     assert (std.isArray(fields) && _allTypeOf(fields, std.isString)) || std.isString(fields) : 'utils.objectHas second parameter should be a string or a non empty string array, got ' + std.type(fields);
     _objectHas(obj, fields),
 
+  // valueOrDefault returns default if object does not contain the target
+  local _valueOrDefault = function(obj, fields, default)
+    if std.isString(fields) then
+      if std.objectHas(obj, fields) then obj[fields]
+      else default
+    else _nestedValueOrDefault(obj, fields, default),
+  local _nestedValueOrDefault = function(obj, fields, default)
+    if std.objectHas(obj, fields[0]) then
+      if std.length(fields) == 1 then obj[fields[0]]
+      else if std.isObject(obj[fields[0]]) then _nestedValueOrDefault(obj[fields[0]], _tail(fields), default) tailstrict
+      else default
+    else default,
+  valueOrDefault(obj, fields, default)::
+    assert std.isObject(obj) : 'utils.valueOrDefault first parameter should be an object, got ' + std.type(obj);
+    assert (std.isArray(fields) && _allTypeOf(fields, std.isString)) || std.isString(fields) : 'utils.valueOrDefault second parameter should be a string or a non empty string array, got ' + std.type(fields);
+    _valueOrDefault(obj, fields, default),
+
   // -- Objects :: Edition tools
   // deepMerge merge two object recursively, merging also array.
   local _deepMerge = function(a, b, uniqFnc=_uniql)
