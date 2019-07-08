@@ -1,0 +1,3 @@
+{
+    scaleway:: import "terraform/scaleway.libjsonnet"
+}
