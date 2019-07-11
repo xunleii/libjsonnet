@@ -1,0 +1,168 @@
+local network = import '../network.libjsonnet';
+
+{
+  available_arch:: ['arm', 'arm64', 'x86_64'],
+  available_boottype:: ['bootscript', 'local'],
+  available_region:: ['par1', 'ams1'],
+  available_security_direction:: ['inbound', 'outbound'],
+  available_security_policy:: ['accept', 'drop'],
+  available_security_protocol:: ['ICMP', 'TCP', 'UDP'],
+  available_state:: ['stopped', 'running'],
+  available_volume_type:: ['l_ssd'],
+
+  Scaleway:: {
+    assert std.length(std.find(self.region, $.available_region)) > 0 :
+           "provider.scaleway: region must be one of %s (not '%s')." % [$.available_region, self.region],
+
+    organization: error 'provider.scaleway: organization must be set.',
+    token: error 'provider.scaleway: token must be set.',
+    region: error 'provider.scaleway: region must be set.',
+  },
+
+  ScalewayBootscript:: {
+    assert self.architecture == null || std.length(std.find(self.architecture, $.available_arch)) > 0 :
+           "data.scaleway_bootscript: architecture must be one of %s (not '%s')." % [$.available_arch, self.architecture],
+    assert self.name_filter == null && self.name == null :
+           'data.scaleway_bootscript: name_filter or name must be set.',
+
+    architecture:: null,
+    name_filter:: null,
+    name:: null,
+  },
+
+  ScalewayImage:: {
+    assert self.architecture == null || std.length(std.find(self.architecture, $.available_arch)) > 0 :
+           "data.scaleway_image: architecture must be one of %s (not '%s')." % [$.available_arch, self.architecture],
+    assert self.name_filter == null || (self.name_filter != null && self.most_recent != true) :
+           'data.scaleway_image: most_recent can not be used together with name_filter.',
+    assert self.name_filter != null || self.name != null :
+           'data.scaleway_image: name_filter or name must be set.',
+
+    architecture:: null,
+    name_filter:: null,
+    name:: null,
+    most_recent: false,
+  },
+
+  ScalewaySecurityGroupInformation:: {
+    name: error 'data.scaleway_security_group: name must be set.',
+  },
+
+  ScalewayVolumeInformation:: {
+    name: error 'data.scaleway_volume: name must be set.',
+  },
+
+  ScalewayBucket:: {
+    name: error 'resource.scaleway_bucket: name must be set.',
+  },
+
+  ScalewayIp:: {
+    assert self.reverse == null :
+           'resource.scaleway_ip: reverse is deprecated. Please us the scaleway_ip_reverse_dns resource instead.',
+
+    server:: null,
+    reverse:: null,
+  },
+
+  ScalewayIpReverseDns:: {
+    ip: error 'resource.scaleway_ip_reverse_dns: ip must be set.',
+    reverse: error 'resource.scaleway_ip_reverse_dns: reverse must be set.',
+  },
+
+  ScalewaySecurityGroup:: {
+    assert self.inbound_default_policy == null || std.length(std.find(self.inbound_default_policy, $.available_security_policy)) > 0 :
+           "resource.scaleway_security_group: inbound_default_policy must be one of %s (not '%s')." % [$.available_security_policy, self.inbound_default_policy],
+    assert self.outbound_default_policy == null || std.length(std.find(self.outbound_default_policy, $.available_security_policy)) > 0 :
+           "resource.scaleway_security_group: outbound_default_policy must be one of %s (not '%s')." % [$.available_security_policy, self.outbound_default_policy],
+
+    name: error 'resource.scaleway_security_group: name must be set.',
+    description: error 'resource.scaleway_security_group: description must be set.',
+    enable_default_security: true,
+    stateful: false,
+    inbound_default_policy:: null,
+    outbound_default_policy:: null,
+  },
+
+  ScalewaySecurityGroupRule:: {
+    assert std.length(std.find(self.action, $.available_security_policy)) > 0 :
+           "resource.scaleway_security_group_rule: action must be one of %s (not '%s')." % [$.available_security_policy, self.action],
+    assert std.length(std.find(self.direction, $.available_security_direction)) > 0 :
+           "resource.scaleway_security_group_rule: direction must be one of %s (not '%s')." % [$.available_security_direction, self.direction],
+    assert std.length(std.find(self.protocol, $.available_security_protocol)) > 0 :
+           "resource.scaleway_security_group_rule: protocol must be one of %s (not '%s')." % [$.available_security_protocol, self.protocol],
+    assert network.ipv4.addr.parse(self.ip_range).bytes >= 0 :
+           'resource.scaleway_security_group_rule: ip_range must be valid IPv4.',
+    assert self.port == null || (self.port >= 0 && self.port <= 65535) :
+           'resource.scaleway_security_group_rule: port must be in [0, 65535].',
+
+    security_group: error 'resource.scaleway_security_group_rule: security_group must be set.',
+    action: error 'resource.scaleway_security_group_rule: action must be set.',
+    direction: error 'resource.scaleway_security_group_rule: direction must be set.',
+    ip_range: error 'resource.scaleway_security_group_rule: ip_range must be set.',
+    protocol: error 'resource.scaleway_security_group_rule: protocol must be set.',
+    port:: null,
+  },
+
+  ScalewayServer:: {
+    assert self.state == null || std.length(std.find(self.state, $.available_state)) > 0 :
+           "resource.scaleway_server: state must be one of %s (not '%s')." % [$.available_state, self.state],
+    assert self.boot_type == null || std.length(std.find(self.boot_type, $.available_boottype)) > 0 :
+           "resource.scaleway_server: boot_type must be one of %s (not '%s')." % [$.available_boottype, self.boot_type],
+    assert self.boot_type == null || self.boot_type == 'local' || (self.boot_type == 'bootscript' && self.bootscript != null) :
+           "resource.scaleway_server: bootscript must be set if boot_type is 'bootscript'.",
+    assert self.tags == null || std.isArray(self.tags) :
+           'resorce.scaleway_server: tags must be an array.',
+    assert self.volume == null || std.isArray(self.volume) :
+           'resorce.scaleway_server: volume must be an array.',
+
+    name: error 'resource.scaleway_server: name must be set.',
+    image: error 'resource.scaleway_server: image must be set.',
+    type: error 'resource.scaleway_server: type must be set.',
+    bootscript:: null,
+    boot_type: 'local',
+    tags:: null,
+    enable_ipv6:: null,
+    dynamic_ip_required:: null,
+    public_ip:: null,
+    security_group:: null,
+    volume:: null,
+    state:: null,
+    cloudinit:: null,
+  },
+
+  ScalewaySshKey:: {
+    key: error 'resource.scaleway_ssh_key: key must be set.',
+  },
+
+  ScalewayToken:: {
+    description:: null,
+    email:: null,
+    password:: null,
+    expires: false,
+  },
+
+  ScalewayUserData:: {
+    server: error 'resource.scaleway_user_data: server must be set.',
+    key: error 'resource.scaleway_user_data: key must be set.',
+    value: error 'resource.scaleway_user_data: value must be set.',
+  },
+
+  ScalewayVolume:: self.ScalewayAttachedVolume {
+    name: error 'resource.scaleway_volume: name must be set.',
+  },
+
+  ScalewayAttachedVolume:: {
+    assert self.type == null || std.length(std.find(self.type, $.available_volume_type)) > 0 :
+           "resource.scaleway_volume: type must be one of %s (not '%s')." % [$.available_volume_type, self.type],
+    assert std.isNumber(self.size_in_gb) :
+           error 'resource.scaleway_volume: size_in_gb must be a number',
+
+    size_in_gb: error 'resource.scaleway_volume: size_in_gb must be set.',
+    type: error 'resource.scaleway_volume: type must be set.',
+  },
+
+  ScalewayVolumeAttachment:: {
+    server: error 'resource.scaleway_volume_attachment: server must be set.',
+    volume: error 'resource.scaleway_volume_attachment: volume must be set.',
+  },
+}
