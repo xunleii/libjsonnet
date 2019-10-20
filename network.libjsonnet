@@ -5,6 +5,17 @@
   ip_mask:: [4278190080, 16711680, 65280, 255],
 
   ipv4:: {
+    /**
+     * Parse an IPv4 address and returns an object containing information about it.
+     *
+     * @param addr IP address, which can be a string or an integer (sum of the IP bytes)
+     * @param mask IP mask, which is ignored if the previous parameter contains the mask
+     * @return A json representation of the IP address
+     *    - short:  String representation of the address, without mask
+     *    - full:   String representation of the address, with mask
+     *    - bytes:  Integer value of the address (sum of all bytes)
+     *    - mask:   Integer value of the address mask
+     */
     addr(addr, mask=-1)::
       assert std.isString(addr) || std.isNumber(addr) : 'ipv4.addr first parameter must be a number or a string';
       if std.isNumber(addr)
@@ -44,6 +55,22 @@
           mask:: netmask,
         },
 
+    /**
+     * Parse an IPv4 address as subnet and returns an object containing information about it.
+     *
+     * @param addr              IP address, which can be a string or an integer (sum of the IP bytes)
+     * @param mask              IP mask, which is ignored if the previous parameter contains the mask
+     * @param ignore_validation Ignore all verification, for internal usage
+     * @return A json representation of the IPv4 subnet
+     *    - address:    IPv4 object of the subnet
+     *    - broadcast:  IPv4 address of the broadcast (string)
+     *    - mask:       Integer netmask
+     *    - netmask:    Human readable netmask (string)
+     *    - wildcard:   Inverse of netmask
+     *    - hostMin:    IPv4 of the first subnet host (string)
+     *    - hostMax:    IPv4 of the last subnet host (string)
+     *    - numHost:    Number of possible host in the subnet
+     */
     subnet(addr, mask=-1, ignore_validation=false)::
       assert std.isNumber(addr) || std.isString(addr) || std.isObject(addr) : 'ipv4.subnet first parameter must be a number or a string';
       local numericAddress = function(addr, mask)
@@ -67,22 +94,49 @@
                  else objectAddress(addr))
                 + { net:: self.bytes & $.mask[self.mask] },
 
+        /**
+         * Return the IPv4 address of the nth 'host' in the subnet.
+         *
+         * @param nth  The index of the internal subnet IP
+         * @return A json representation of the nth IP address
+         */
+        ip(nth=0)::
+          assert nth < self.numHost : 'subnet in /%s cannot have more than %d addresses' % [self._addr.mask, self.numHost];
+          $.ipv4.addr(self._addr.net + nth, self._addr.mask),
+        /**
+         * Return the subnet object of the next nth subnet, with the same mask.
+         *
+         * @param index  The index of the next subnet
+         * @return A json representation of the next nth subnet
+         */
         prev(index=1):: self.next(-index),
+        /**
+         * Return the subnet object of the previous nth subnet, with the same mask.
+         *
+         * @param index  The index of the previous subnet
+         * @return A json representation of the previous nth subnet
+         */
         next(index=1)::
           local bytes = self._addr.net + $.pow2[32 - self._addr.mask] * index;
           local mask = self._addr.mask;
           $.ipv4.subnet({ bytes:: bytes, mask:: mask }, null, true),
+        /**
+         * Check if the given network contains the current subnet.
+         *
+         * @param network  The object representation of the parent network (must be a subnet object)
+         * @return True if the current subnet is contained in the given network, otherwise false
+         */
         subnetOf(network)::
           assert std.isString(network) || 'address' in network : 'ipv4.subnet.subnetOf must be a string or a parsed subnet';
           local net = $.ipv4.subnet(network.address);
-          local subnet = $.ipv4.subnet(self._addr.net, net.mask);
-          net.mask < self.mask && subnet._addr.net == net._addr.net,
+          local subnet = $.ipv4.subnet(self._addr.net, net._addr.mask);
+          net._addr.mask < self._addr.mask && subnet._addr.net == net._addr.net,
 
         address: $.ipv4.addr(self._addr.net, self._addr.mask),
         broadcast: (if self._addr.mask > 30 then null
                     else if self._addr.mask == 0 then '255.255.255.255'
                     else $.ipv4.addr(self.next()._addr.net - 1, self._addr.mask).short),
-        mask: self._addr.mask,
+        mask: $.mask[self._addr.mask],
         netmask: $.ipv4.addr($.mask[self._addr.mask], self._addr.mask).short,
         wildcard: $.ipv4.addr($.wildcard[self._addr.mask], self._addr.mask).short,
 
